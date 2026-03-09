@@ -147,13 +147,19 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(__dirname, "dist");
+    
+    // Serve static files from the dist directory
     app.use(express.static(distPath));
     
     // SPA Fallback: Serve index.html for any unknown routes
     app.get("*", (req, res) => {
-      // Skip API routes
-      if (req.path.startsWith('/api/')) return res.status(404).json({ error: "Not found" });
-      res.sendFile(path.join(distPath, "index.html"));
+      // Skip API routes to avoid infinite loops or wrong responses
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: "API endpoint not found" });
+      }
+      
+      const indexPath = path.join(distPath, "index.html");
+      res.sendFile(indexPath);
     });
   }
 
