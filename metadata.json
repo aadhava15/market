@@ -1,0 +1,5 @@
+{
+  "name": "StockMaster Pro",
+  "description": "A comprehensive inventory management system with barcode generation, purchase tracking, and real-time stock reporting.",
+  "requestFramePermissions": ["camera"]
+}
