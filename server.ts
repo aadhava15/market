@@ -23,25 +23,6 @@ async function startServer() {
 
   // --- API Routes ---
 
-  // Auth
-  app.post("/api/login", (req, res) => {
-    const { username, password } = req.body;
-    console.log(`Login attempt for username: ${username}`);
-    try {
-      const user = db.prepare('SELECT * FROM users WHERE username = ? AND password = ?').get(username, password);
-      if (user) {
-        console.log(`Login successful for user: ${username}, role: ${user.role}`);
-        res.json({ success: true, user: { id: user.id, username: user.username, role: user.role } });
-      } else {
-        console.log(`Login failed for user: ${username} - Invalid credentials`);
-        res.status(401).json({ success: false, message: "Invalid credentials" });
-      }
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ success: false, message: "Internal server error" });
-    }
-  });
-
   // Dashboard Stats
   app.get("/api/stats", (req, res) => {
     const totalProducts = db.prepare('SELECT COUNT(*) as count FROM products').get().count;
