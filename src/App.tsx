@@ -1268,8 +1268,18 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
           >
             Sign In
           </button>
-          <div className="text-center">
+          <div className="flex flex-col items-center gap-2">
             <p className="text-xs text-slate-400">Default: admin / admin123</p>
+            <button 
+              type="button"
+              onClick={() => {
+                localStorage.removeItem('stockmaster_user');
+                window.location.reload();
+              }}
+              className="text-xs text-indigo-600 hover:underline"
+            >
+              Clear Stale Session
+            </button>
           </div>
         </form>
       </div>

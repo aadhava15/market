@@ -61,10 +61,20 @@ db.exec(`
   );
 `);
 
+// Ensure role column exists (in case table was created without it)
+try {
+  db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'viewer'");
+} catch (e) {
+  // Column already exists
+}
+
 // Seed default user if not exists
 const userExists = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
 if (!userExists) {
   db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run('admin', 'admin123', 'admin');
+} else {
+  // Ensure the admin user has the admin role and correct password if it was lost
+  db.prepare('UPDATE users SET role = ?, password = ? WHERE username = ?').run('admin', 'admin123', 'admin');
 }
 
 export default db;
