@@ -14,7 +14,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
     password TEXT,
-    role TEXT DEFAULT 'user'
+    role TEXT DEFAULT 'viewer'
   );
 
   CREATE TABLE IF NOT EXISTS vendors (

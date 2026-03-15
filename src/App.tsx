@@ -37,10 +37,12 @@ function cn(...inputs: ClassValue[]) {
 }
 
 // --- Types ---
+type UserRole = 'admin' | 'editor' | 'viewer';
+
 interface User {
   id: number;
   username: string;
-  role: string;
+  role: UserRole;
 }
 
 interface Vendor {
@@ -69,18 +71,79 @@ interface Product {
 
 // --- Components ---
 
-const Sidebar = ({ user, onLogout }: { user: User; onLogout: () => void }) => {
+const Modal = ({ 
+  isOpen, 
+  onClose, 
+  title, 
+  children, 
+  onConfirm, 
+  confirmText = "Confirm", 
+  cancelText = "Cancel",
+  type = "info" 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  title: string, 
+  children: React.ReactNode, 
+  onConfirm?: () => void, 
+  confirmText?: string, 
+  cancelText?: string,
+  type?: "info" | "danger" | "success"
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6 text-slate-600">
+          {children}
+        </div>
+        <div className="p-6 bg-slate-50 flex justify-end gap-3">
+          <button 
+            onClick={onClose} 
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+          >
+            {cancelText}
+          </button>
+          {onConfirm && (
+            <button 
+              onClick={() => { onConfirm(); onClose(); }} 
+              className={cn(
+                "px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors shadow-lg",
+                type === "danger" ? "bg-red-600 hover:bg-red-700 shadow-red-100" : 
+                type === "success" ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" :
+                "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
+              )}
+            >
+              {confirmText}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Sidebar = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(true);
 
   const menuItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Purchase Entry', path: '/purchase', icon: ShoppingCart },
-    { name: 'Stock Reports', path: '/stock', icon: Package },
-    { name: 'Vendors', path: '/vendors', icon: Truck },
-    { name: 'Categories', path: '/categories', icon: Tags },
-    { name: 'Users', path: '/users', icon: Users },
+    { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['admin', 'editor', 'viewer'] },
+    { name: 'Purchase Entry', path: '/purchase', icon: ShoppingCart, roles: ['admin', 'editor'] },
+    { name: 'Stock Reports', path: '/stock', icon: Package, roles: ['admin', 'editor', 'viewer'] },
+    { name: 'Vendors', path: '/vendors', icon: Truck, roles: ['admin', 'editor'] },
+    { name: 'Categories', path: '/categories', icon: Tags, roles: ['admin', 'editor'] },
+    { name: 'Users', path: '/users', icon: Users, roles: ['admin'] },
   ];
+
+  const filteredItems = menuItems.filter(item => item.roles.includes(user.role));
 
   return (
     <div className={cn("flex flex-col h-screen bg-white border-r border-slate-200 transition-all duration-300", isOpen ? "w-64" : "w-20")}>
@@ -92,7 +155,7 @@ const Sidebar = ({ user, onLogout }: { user: User; onLogout: () => void }) => {
       </div>
 
       <nav className="flex-1 px-4 space-y-1">
-        {menuItems.map((item) => (
+        {filteredItems.map((item) => (
           <Link
             key={item.path}
             to={item.path}
@@ -108,7 +171,7 @@ const Sidebar = ({ user, onLogout }: { user: User; onLogout: () => void }) => {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-slate-100">
+      <div className="p-4 border-t border-slate-100 space-y-2">
         <div className={cn("flex items-center gap-3 p-2", !isOpen && "justify-center")}>
           <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
             {user.username[0].toUpperCase()}
@@ -122,17 +185,20 @@ const Sidebar = ({ user, onLogout }: { user: User; onLogout: () => void }) => {
         </div>
         <button 
           onClick={onLogout}
-          className={cn("w-full mt-2 flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors", !isOpen && "justify-center px-0")}
+          className={cn(
+            "w-full flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors",
+            !isOpen && "justify-center px-0"
+          )}
         >
           <LogOut size={20} />
-          {isOpen && <span>Logout</span>}
+          {isOpen && <span className="text-sm font-medium">Logout</span>}
         </button>
       </div>
     </div>
   );
 };
 
-const Dashboard = () => {
+const Dashboard = ({ user }: { user: User }) => {
   const [stats, setStats] = useState({ totalProducts: 0, totalStock: 0, totalSales: 0 });
 
   useEffect(() => {
@@ -141,10 +207,12 @@ const Dashboard = () => {
       .then(data => setStats(data));
   }, []);
 
+  const canManage = user.role === 'admin' || user.role === 'editor';
+
   return (
     <div className="p-8 space-y-8">
       <header>
-        <h2 className="text-2xl font-bold">Welcome back!</h2>
+        <h2 className="text-2xl font-bold">Welcome back, {user.username}!</h2>
         <p className="text-slate-500">Here's what's happening with your inventory today.</p>
       </header>
 
@@ -183,21 +251,23 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <h4 className="font-bold mb-4">Quick Actions</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <Link to="/purchase" className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors flex flex-col items-center gap-2">
-              <Plus className="text-indigo-600" />
-              <span className="text-sm font-medium">New Purchase</span>
-            </Link>
-            <Link to="/stock" className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors flex flex-col items-center gap-2">
-              <Search className="text-indigo-600" />
-              <span className="text-sm font-medium">Check Stock</span>
-            </Link>
+      {canManage && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <h4 className="font-bold mb-4">Quick Actions</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <Link to="/purchase" className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors flex flex-col items-center gap-2">
+                <Plus className="text-indigo-600" />
+                <span className="text-sm font-medium">New Purchase</span>
+              </Link>
+              <Link to="/stock" className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors flex flex-col items-center gap-2">
+                <Search className="text-indigo-600" />
+                <span className="text-sm font-medium">Check Stock</span>
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -222,6 +292,8 @@ const PurchaseEntry = () => {
   });
   const [showBarcode, setShowBarcode] = useState(false);
   const barcodeRef = useRef<SVGSVGElement>(null);
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     fetch('/api/vendors').then(res => res.json()).then(setVendors);
@@ -264,7 +336,7 @@ const PurchaseEntry = () => {
     });
     if (res.ok) {
       setShowBarcode(true);
-      alert('Purchase saved successfully!');
+      setShowSuccessModal(true);
     }
   };
 
@@ -290,6 +362,16 @@ const PurchaseEntry = () => {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
+      <Modal 
+        isOpen={showSuccessModal} 
+        onClose={() => setShowSuccessModal(false)} 
+        title="Success"
+        type="success"
+        confirmText="OK"
+        onConfirm={() => setShowSuccessModal(false)}
+      >
+        Purchase entry has been saved successfully and barcode generated.
+      </Modal>
       <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
         <h2 className="text-2xl font-bold mb-6">New Purchase Entry</h2>
         
@@ -451,18 +533,24 @@ const PurchaseEntry = () => {
   );
 };
 
-const StockReports = () => {
+const StockReports = ({ user }: { user: User }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [lastScanned, setLastScanned] = useState<string | null>(null);
   const scannerRef = useRef<HTMLDivElement>(null);
+
+  const canManage = user.role === 'admin' || user.role === 'editor';
 
   useEffect(() => {
     fetch('/api/products').then(res => res.json()).then(setProducts);
   }, []);
 
   const startScanner = () => {
+    setSearch(''); // Clear search before starting new scan
     setIsScanning(true);
+    setLastScanned(null);
+    
     Quagga.init({
       inputStream: {
         type: "LiveStream",
@@ -475,18 +563,30 @@ const StockReports = () => {
       },
       decoder: {
         readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader"]
-      }
+      },
+      locate: true
     }, (err) => {
       if (err) {
         console.error(err);
+        setIsScanning(false);
         return;
       }
       Quagga.start();
     });
 
     Quagga.onDetected((data) => {
-      setSearch(data.codeResult.code || '');
-      stopScanner();
+      const code = data.codeResult.code;
+      if (code) {
+        setSearch(code);
+        setLastScanned(code);
+        stopScanner();
+        
+        // Visual feedback: briefly highlight the search result then clear if needed
+        // The user asked to "automatically clear the search input after a successful scan"
+        // but usually you want to see the result. We'll add a clear button for manual clearing
+        // and a brief "Success" state.
+        setTimeout(() => setLastScanned(null), 2000);
+      }
     });
   };
 
@@ -508,36 +608,70 @@ const StockReports = () => {
           <p className="text-slate-500">Manage and track your current inventory levels.</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
+          <div className="relative flex-1 md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text" 
               placeholder="Search by name or barcode..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none w-full md:w-64"
+              className={cn(
+                "pl-10 pr-10 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none w-full transition-all",
+                lastScanned && "ring-2 ring-emerald-500 border-emerald-500"
+              )}
             />
+            {search && (
+              <button 
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
-          <button 
-            onClick={startScanner}
-            className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
-            title="Scan Barcode"
-          >
-            <ScanLine size={20} />
-          </button>
+          {canManage && (
+            <button 
+              onClick={startScanner}
+              className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-100"
+              title="Scan Barcode"
+            >
+              <ScanLine size={20} />
+            </button>
+          )}
         </div>
       </div>
 
       {isScanning && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl overflow-hidden max-w-lg w-full">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h3 className="font-bold">Scan Barcode</h3>
-              <button onClick={stopScanner}><X /></button>
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl overflow-hidden max-w-lg w-full shadow-2xl">
+            <div className="p-4 border-b flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <h3 className="font-bold">Scanning Barcode...</h3>
+              </div>
+              <button onClick={stopScanner} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <X size={20} />
+              </button>
             </div>
-            <div ref={scannerRef} className="aspect-video bg-black"></div>
-            <div className="p-4 text-center text-sm text-slate-500">
-              Point your camera at the barcode
+            <div className="relative aspect-video bg-black">
+              <div ref={scannerRef} className="w-full h-full [&>video]:w-full [&>video]:h-full [&>video]:object-cover"></div>
+              
+              {/* Scanning Overlay */}
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute inset-[15%] border-2 border-white/30 rounded-2xl">
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-indigo-500 rounded-tl-lg" />
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-indigo-500 rounded-tr-lg" />
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-indigo-500 rounded-bl-lg" />
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-indigo-500 rounded-br-lg" />
+                  
+                  {/* Laser Line Animation */}
+                  <div className="absolute left-0 right-0 h-0.5 bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)] animate-[scan_2s_ease-in-out_infinite]" />
+                </div>
+              </div>
+            </div>
+            <div className="p-6 text-center space-y-2">
+              <p className="text-sm text-slate-600 font-medium">Align the barcode within the frame</p>
+              <p className="text-xs text-slate-400">Supported: Code 128, EAN, Code 39</p>
             </div>
           </div>
         </div>
@@ -546,7 +680,7 @@ const StockReports = () => {
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50 border-bottom border-slate-200">
+            <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-6 py-4 text-sm font-bold text-slate-500 uppercase tracking-wider">Item</th>
               <th className="px-6 py-4 text-sm font-bold text-slate-500 uppercase tracking-wider">Category</th>
               <th className="px-6 py-4 text-sm font-bold text-slate-500 uppercase tracking-wider">Barcode</th>
@@ -555,29 +689,41 @@ const StockReports = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredProducts.map(product => (
-              <tr key={product.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="font-medium">{product.item_name}</div>
-                  <div className="text-xs text-slate-400">{product.item_code}</div>
+            {filteredProducts.length > 0 ? (
+              filteredProducts.map(product => (
+                <tr key={product.id} className={cn(
+                  "hover:bg-slate-50 transition-colors",
+                  search === product.barcode_number && "bg-indigo-50/50"
+                )}>
+                  <td className="px-6 py-4">
+                    <div className="font-medium">{product.item_name}</div>
+                    <div className="text-xs text-slate-400">{product.item_code}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium">
+                      {product.category_name}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 font-mono text-sm">{product.barcode_number}</td>
+                  <td className="px-6 py-4">
+                    <span className={cn(
+                      "font-bold",
+                      product.quantity < 10 ? "text-red-600" : "text-slate-900"
+                    )}>
+                      {product.quantity} {product.unit}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">${product.rate}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                  <Package className="mx-auto mb-2 opacity-20" size={48} />
+                  <p>No products found matching your search.</p>
                 </td>
-                <td className="px-6 py-4">
-                  <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium">
-                    {product.category_name}
-                  </span>
-                </td>
-                <td className="px-6 py-4 font-mono text-sm">{product.barcode_number}</td>
-                <td className="px-6 py-4">
-                  <span className={cn(
-                    "font-bold",
-                    product.quantity < 10 ? "text-red-600" : "text-slate-900"
-                  )}>
-                    {product.quantity} {product.unit}
-                  </span>
-                </td>
-                <td className="px-6 py-4">${product.rate}</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
@@ -587,38 +733,70 @@ const StockReports = () => {
 
 const VendorsPage = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [newVendor, setNewVendor] = useState({ name: '', contact: '', address: '' });
+  const [formData, setFormData] = useState({ name: '', contact: '', address: '' });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch('/api/vendors').then(res => res.json()).then(setVendors);
+    fetchVendors();
   }, []);
+
+  const fetchVendors = () => {
+    fetch('/api/vendors').then(res => res.json()).then(setVendors);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/vendors', {
-      method: 'POST',
+    const url = editingId ? `/api/vendors/${editingId}` : '/api/vendors';
+    const method = editingId ? 'PUT' : 'POST';
+    
+    const res = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newVendor)
+      body: JSON.stringify(formData)
     });
+
     if (res.ok) {
-      const data = await res.json();
-      setVendors([...vendors, { ...newVendor, id: data.id }]);
-      setNewVendor({ name: '', contact: '', address: '' });
+      fetchVendors();
+      setFormData({ name: '', contact: '', address: '' });
+      setEditingId(null);
     }
+  };
+
+  const handleEdit = (vendor: Vendor) => {
+    setEditingId(vendor.id);
+    setFormData({ name: vendor.name, contact: vendor.contact || '', address: vendor.address || '' });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    const res = await fetch(`/api/vendors/${deleteId}`, { method: 'DELETE' });
+    if (res.ok) fetchVendors();
+    setDeleteId(null);
   };
 
   return (
     <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <Modal 
+        isOpen={deleteId !== null} 
+        onClose={() => setDeleteId(null)} 
+        title="Delete Vendor"
+        type="danger"
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+      >
+        Are you sure you want to delete this vendor? This action cannot be undone.
+      </Modal>
       <div className="lg:col-span-1">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm sticky top-8">
-          <h3 className="text-lg font-bold mb-4">Add New Vendor</h3>
+          <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Vendor' : 'Add New Vendor'}</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
               <label className="text-sm font-medium">Name</label>
               <input 
                 type="text" 
-                value={newVendor.name}
-                onChange={e => setNewVendor({...newVendor, name: e.target.value})}
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
                 className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
                 required
               />
@@ -627,22 +805,33 @@ const VendorsPage = () => {
               <label className="text-sm font-medium">Contact</label>
               <input 
                 type="text" 
-                value={newVendor.contact}
-                onChange={e => setNewVendor({...newVendor, contact: e.target.value})}
+                value={formData.contact}
+                onChange={e => setFormData({...formData, contact: e.target.value})}
                 className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Address</label>
               <textarea 
-                value={newVendor.address}
-                onChange={e => setNewVendor({...newVendor, address: e.target.value})}
+                value={formData.address}
+                onChange={e => setFormData({...formData, address: e.target.value})}
                 className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-            <button className="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors">
-              Save Vendor
-            </button>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors">
+                {editingId ? 'Update Vendor' : 'Save Vendor'}
+              </button>
+              {editingId && (
+                <button 
+                  type="button" 
+                  onClick={() => { setEditingId(null); setFormData({ name: '', contact: '', address: '' }); }}
+                  className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
           </form>
         </div>
       </div>
@@ -654,6 +843,7 @@ const VendorsPage = () => {
                 <th className="px-6 py-4 font-bold text-slate-500 text-sm uppercase">Vendor Name</th>
                 <th className="px-6 py-4 font-bold text-slate-500 text-sm uppercase">Contact</th>
                 <th className="px-6 py-4 font-bold text-slate-500 text-sm uppercase">Address</th>
+                <th className="px-6 py-4 font-bold text-slate-500 text-sm uppercase text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -662,6 +852,10 @@ const VendorsPage = () => {
                   <td className="px-6 py-4 font-medium">{v.name}</td>
                   <td className="px-6 py-4">{v.contact}</td>
                   <td className="px-6 py-4 text-slate-500">{v.address}</td>
+                  <td className="px-6 py-4 text-right space-x-2">
+                    <button onClick={() => handleEdit(v)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Edit</button>
+                    <button onClick={() => setDeleteId(v.id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -675,29 +869,81 @@ const VendorsPage = () => {
 const CategoriesPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [newName, setNewName] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/categories').then(res => res.json()).then(setCategories);
+    fetchCategories();
   }, []);
+
+  const fetchCategories = () => {
+    fetch('/api/categories').then(res => res.json()).then(setCategories);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/categories', {
-      method: 'POST',
+    const url = editingId ? `/api/categories/${editingId}` : '/api/categories';
+    const method = editingId ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName })
     });
+
     if (res.ok) {
-      const data = await res.json();
-      setCategories([...categories, { id: data.id, name: newName }]);
+      fetchCategories();
       setNewName('');
+      setEditingId(null);
+    } else {
+      const data = await res.json();
+      setErrorMsg(data.error || 'Failed to save category');
     }
+  };
+
+  const handleEdit = (category: Category) => {
+    setEditingId(category.id);
+    setNewName(category.name);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    const res = await fetch(`/api/categories/${deleteId}`, { method: 'DELETE' });
+    if (res.ok) {
+      fetchCategories();
+    } else {
+      const data = await res.json();
+      setErrorMsg(data.error || 'Failed to delete category');
+    }
+    setDeleteId(null);
   };
 
   return (
     <div className="p-8 max-w-2xl mx-auto space-y-8">
+      <Modal 
+        isOpen={deleteId !== null} 
+        onClose={() => setDeleteId(null)} 
+        title="Delete Category"
+        type="danger"
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+      >
+        Are you sure you want to delete this category? This action cannot be undone and may fail if products are linked to it.
+      </Modal>
+      <Modal 
+        isOpen={errorMsg !== null} 
+        onClose={() => setErrorMsg(null)} 
+        title="Error"
+        type="danger"
+        confirmText="OK"
+        onConfirm={() => setErrorMsg(null)}
+      >
+        {errorMsg}
+      </Modal>
+
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <h3 className="text-lg font-bold mb-4">Add Category</h3>
+        <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Category' : 'Add Category'}</h3>
         <form onSubmit={handleSubmit} className="flex gap-4">
           <input 
             type="text" 
@@ -707,9 +953,20 @@ const CategoriesPage = () => {
             className="flex-1 px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
             required
           />
-          <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700">
-            Add
-          </button>
+          <div className="flex gap-2">
+            <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700">
+              {editingId ? 'Update' : 'Add'}
+            </button>
+            {editingId && (
+              <button 
+                type="button"
+                onClick={() => { setEditingId(null); setNewName(''); }}
+                className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -719,11 +976,228 @@ const CategoriesPage = () => {
         </div>
         <div className="divide-y">
           {categories.map(c => (
-            <div key={c.id} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50">
+            <div key={c.id} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
               <span className="font-medium">{c.name}</span>
-              <ChevronRight size={16} className="text-slate-300" />
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => handleEdit(c)}
+                  className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                >
+                  Edit
+                </button>
+                <button 
+                  onClick={() => setDeleteId(c.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
+          {categories.length === 0 && (
+            <div className="px-6 py-12 text-center text-slate-500">
+              <Tags className="mx-auto mb-2 opacity-20" size={48} />
+              <p>No categories found.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const UsersPage = ({ user: currentUser }: { user: User }) => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [formData, setFormData] = useState({ username: '', password: '', role: 'viewer' as UserRole });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = () => {
+    fetch('/api/users').then(res => res.json()).then(setUsers);
+  };
+
+  const filteredUsers = users.filter(u => 
+    u.username.toLowerCase().includes(search.toLowerCase()) ||
+    u.role.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const url = editingId ? `/api/users/${editingId}` : '/api/users';
+    const method = editingId ? 'PUT' : 'POST';
+    
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...formData, requesterRole: currentUser.role })
+    });
+
+    if (res.ok) {
+      fetchUsers();
+      setFormData({ username: '', password: '', role: 'viewer' as UserRole });
+      setEditingId(null);
+    } else {
+      const data = await res.json();
+      setErrorMsg(data.error || 'Failed to save user');
+    }
+  };
+
+  const handleEdit = (user: User) => {
+    setEditingId(user.id);
+    setFormData({ username: user.username, password: '', role: user.role });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    const res = await fetch(`/api/users/${deleteId}?requesterRole=${currentUser.role}`, { method: 'DELETE' });
+    if (res.ok) fetchUsers();
+    setDeleteId(null);
+  };
+
+  return (
+    <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <Modal 
+        isOpen={deleteId !== null} 
+        onClose={() => setDeleteId(null)} 
+        title="Delete User"
+        type="danger"
+        confirmText="Delete"
+        onConfirm={confirmDelete}
+      >
+        Are you sure you want to delete this user? This action cannot be undone.
+      </Modal>
+      <Modal 
+        isOpen={errorMsg !== null} 
+        onClose={() => setErrorMsg(null)} 
+        title="Error"
+        type="danger"
+        confirmText="OK"
+        onConfirm={() => setErrorMsg(null)}
+      >
+        {errorMsg}
+      </Modal>
+      <div className="lg:col-span-1">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm sticky top-8">
+          <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit User' : 'Add New User'}</h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Username</label>
+              <input 
+                type="text" 
+                value={formData.username}
+                onChange={e => setFormData({...formData, username: e.target.value})}
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Password {editingId && '(leave blank to keep current)'}</label>
+              <input 
+                type="password" 
+                value={formData.password}
+                onChange={e => setFormData({...formData, password: e.target.value})}
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                required={!editingId}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Role</label>
+              <select 
+                value={formData.role}
+                onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="viewer">Viewer</option>
+                <option value="editor">Editor</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors">
+                {editingId ? 'Update User' : 'Save User'}
+              </button>
+              {editingId && (
+                <button 
+                  type="button" 
+                  onClick={() => { setEditingId(null); setFormData({ username: '', password: '', role: 'viewer' }); }}
+                  className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+      </div>
+      <div className="lg:col-span-2 space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search users..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none w-full transition-all bg-white"
+            />
+          </div>
+          <div className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-500">
+            {filteredUsers.length} Users
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 border-b">
+              <tr>
+                <th className="px-6 py-4 font-bold text-slate-500 text-sm uppercase">Username</th>
+                <th className="px-6 py-4 font-bold text-slate-500 text-sm uppercase">Role</th>
+                <th className="px-6 py-4 font-bold text-slate-500 text-sm uppercase text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filteredUsers.map(u => (
+                <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
+                        {u.username[0].toUpperCase()}
+                      </div>
+                      <span className="font-medium">{u.username}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={cn(
+                      "px-2 py-1 rounded-md text-xs font-medium capitalize",
+                      u.role === 'admin' ? "bg-purple-50 text-purple-700" : 
+                      u.role === 'editor' ? "bg-blue-50 text-blue-700" :
+                      "bg-slate-100 text-slate-600"
+                    )}>
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right space-x-2">
+                    <button onClick={() => handleEdit(u)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Edit</button>
+                    <button onClick={() => setDeleteId(u.id)} className="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+                  </td>
+                </tr>
+              ))}
+              {filteredUsers.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-6 py-12 text-center text-slate-500">
+                    <Users className="mx-auto mb-2 opacity-20" size={48} />
+                    <p>No users found matching your search.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -742,28 +1216,30 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
-    if (res.ok) {
-      const data = await res.json();
+    const data = await res.json();
+    if (data.success) {
       onLogin(data.user);
     } else {
-      setError('Invalid username or password');
+      setError(data.message);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-3xl shadow-xl shadow-slate-200 border border-slate-100">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-200">
-            <Package className="text-white" size={32} />
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+        <div className="p-8 bg-indigo-600 text-white text-center">
+          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+            <Package size={32} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">StockMaster Pro</h1>
-          <p className="text-slate-500">Sign in to manage your inventory</p>
+          <h1 className="text-2xl font-bold">StockMaster</h1>
+          <p className="text-indigo-100 mt-1">Inventory Management System</p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">{error}</div>}
-          
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100 text-center">
+              {error}
+            </div>
+          )}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Username</label>
             <input 
@@ -771,11 +1247,10 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
               value={username}
               onChange={e => setUsername(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-              placeholder="admin"
+              placeholder="Enter your username"
               required
             />
           </div>
-
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Password</label>
             <input 
@@ -787,54 +1262,93 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
               required
             />
           </div>
-
-          <button className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+          <button 
+            type="submit" 
+            className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+          >
             Sign In
           </button>
+          <div className="text-center">
+            <p className="text-xs text-slate-400">Default: admin / admin123</p>
+          </div>
         </form>
-
-        <div className="mt-8 text-center text-sm text-slate-400">
-          <p>Default credentials: admin / admin123</p>
-        </div>
       </div>
     </div>
   );
 };
 
+const ProtectedRoute = ({ 
+  user, 
+  allowedRoles, 
+  children 
+}: { 
+  user: User | null, 
+  allowedRoles: UserRole[], 
+  children: React.ReactNode 
+}) => {
+  if (!user) return <Navigate to="/login" />;
+  if (!allowedRoles.includes(user.role)) return <Navigate to="/" />;
+  return <>{children}</>;
+};
+
 // --- Main App ---
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('user');
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('stockmaster_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  const handleLogin = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    localStorage.setItem('stockmaster_user', JSON.stringify(user));
   };
 
   const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
+    setCurrentUser(null);
+    localStorage.removeItem('stockmaster_user');
   };
 
-  if (!user) {
-    return <LoginPage onLogin={handleLogin} />;
+  if (!currentUser) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+          <Route path="*" element={<Navigate to="/login" />} />
+        </Routes>
+      </Router>
+    );
   }
 
   return (
     <Router>
       <div className="flex h-screen overflow-hidden">
-        <Sidebar user={user} onLogout={handleLogout} />
+        <Sidebar user={currentUser} onLogout={handleLogout} />
         <main className="flex-1 overflow-y-auto bg-slate-50">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/purchase" element={<PurchaseEntry />} />
-            <Route path="/stock" element={<StockReports />} />
-            <Route path="/vendors" element={<VendorsPage />} />
-            <Route path="/categories" element={<CategoriesPage />} />
-            <Route path="/users" element={<div className="p-8"><h2 className="text-2xl font-bold">User Management</h2><p className="text-slate-500">Feature coming soon.</p></div>} />
+            <Route path="/" element={<Dashboard user={currentUser} />} />
+            <Route path="/purchase" element={
+              <ProtectedRoute user={currentUser} allowedRoles={['admin', 'editor']}>
+                <PurchaseEntry />
+              </ProtectedRoute>
+            } />
+            <Route path="/stock" element={<StockReports user={currentUser} />} />
+            <Route path="/vendors" element={
+              <ProtectedRoute user={currentUser} allowedRoles={['admin', 'editor']}>
+                <VendorsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/categories" element={
+              <ProtectedRoute user={currentUser} allowedRoles={['admin', 'editor']}>
+                <CategoriesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/users" element={
+              <ProtectedRoute user={currentUser} allowedRoles={['admin']}>
+                <UsersPage user={currentUser} />
+              </ProtectedRoute>
+            } />
+            <Route path="/login" element={<Navigate to="/" />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>

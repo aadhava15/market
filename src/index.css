@@ -27,3 +27,8 @@
 .card-stat {
   @apply p-6 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow;
 }
+
+@keyframes scan {
+  0%, 100% { top: 0%; }
+  50% { top: 100%; }
+}

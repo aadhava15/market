@@ -49,6 +49,19 @@ async function startServer() {
     res.json({ id: result.lastInsertRowid });
   });
 
+  app.put("/api/vendors/:id", (req, res) => {
+    const { name, contact, address } = req.body;
+    const { id } = req.params;
+    db.prepare('UPDATE vendors SET name = ?, contact = ?, address = ? WHERE id = ?').run(name, contact, address, id);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/vendors/:id", (req, res) => {
+    const { id } = req.params;
+    db.prepare('DELETE FROM vendors WHERE id = ?').run(id);
+    res.json({ success: true });
+  });
+
   // Categories
   app.get("/api/categories", (req, res) => {
     const categories = db.prepare('SELECT * FROM categories').all();
@@ -62,6 +75,27 @@ async function startServer() {
       res.json({ id: result.lastInsertRowid });
     } catch (e) {
       res.status(400).json({ error: "Category already exists" });
+    }
+  });
+
+  app.put("/api/categories/:id", (req, res) => {
+    const { name } = req.body;
+    const { id } = req.params;
+    try {
+      db.prepare('UPDATE categories SET name = ? WHERE id = ?').run(name, id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(400).json({ error: "Failed to update category" });
+    }
+  });
+
+  app.delete("/api/categories/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(400).json({ error: "Failed to delete category. It might be in use." });
     }
   });
 
@@ -136,6 +170,54 @@ async function startServer() {
     } else {
       res.status(404).json({ error: "Product not found" });
     }
+  });
+
+  // Users
+  app.get("/api/users", (req, res) => {
+    // In a real app, we'd check the session/token here
+    const users = db.prepare('SELECT id, username, role FROM users').all();
+    res.json(users);
+  });
+
+  app.post("/api/users", (req, res) => {
+    const { username, password, role, requesterRole } = req.body;
+    if (requesterRole !== 'admin') {
+      return res.status(403).json({ error: "Only admins can create users" });
+    }
+    try {
+      const result = db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run(username, password, role || 'viewer');
+      res.json({ id: result.lastInsertRowid });
+    } catch (e) {
+      res.status(400).json({ error: "Username already exists" });
+    }
+  });
+
+  app.put("/api/users/:id", (req, res) => {
+    const { username, password, role, requesterRole } = req.body;
+    const { id } = req.params;
+    if (requesterRole !== 'admin') {
+      return res.status(403).json({ error: "Only admins can update users" });
+    }
+    try {
+      if (password) {
+        db.prepare('UPDATE users SET username = ?, password = ?, role = ? WHERE id = ?').run(username, password, role, id);
+      } else {
+        db.prepare('UPDATE users SET username = ?, role = ? WHERE id = ?').run(username, role, id);
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(400).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", (req, res) => {
+    const { id } = req.params;
+    const { requesterRole } = req.query;
+    if (requesterRole !== 'admin') {
+      return res.status(403).json({ error: "Only admins can delete users" });
+    }
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    res.json({ success: true });
   });
 
   // --- Vite Middleware ---
