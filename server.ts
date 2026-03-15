@@ -16,6 +16,11 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Health Check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // --- API Routes ---
 
   // Auth
@@ -254,8 +259,16 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server is strictly listening on port ${PORT}`);
+    console.log(`🔗 Local: http://localhost:${PORT}`);
+    console.log(`🌍 Network: http://0.0.0.0:${PORT}`);
+  }).on('error', (err) => {
+    console.error('❌ Failed to start server:', err);
+    process.exit(1);
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("💥 Fatal error during server startup:", err);
+  process.exit(1);
+});

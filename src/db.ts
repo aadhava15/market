@@ -6,10 +6,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbPath = path.resolve(__dirname, '..', 'inventory.db');
-const db = new Database(dbPath);
+let db: Database.Database;
+
+try {
+  db = new Database(dbPath);
+  console.log(`📂 Database connected at: ${dbPath}`);
+} catch (error) {
+  console.error(`❌ Failed to connect to database at ${dbPath}:`, error);
+  // Fallback to in-memory if file fails (useful for some environments)
+  db = new Database(':memory:');
+  console.warn('⚠️ Using in-memory database as fallback');
+}
 
 // Initialize tables
-db.exec(`
+try {
+  db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
@@ -60,6 +71,9 @@ db.exec(`
     FOREIGN KEY (category_id) REFERENCES categories(id)
   );
 `);
+} catch (error) {
+  console.error('❌ Failed to initialize database tables:', error);
+}
 
 // Ensure role column exists (in case table was created without it)
 try {
