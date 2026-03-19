@@ -82,13 +82,29 @@ try {
   // Column already exists
 }
 
-// Seed default user if not exists
-const userExists = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
-if (!userExists) {
+// Seed default users if not exists
+const adminExists = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
+if (!adminExists) {
   db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run('admin', 'admin123', 'admin');
 } else {
   // Ensure the admin user has the admin role and correct password if it was lost
   db.prepare('UPDATE users SET role = ?, password = ? WHERE username = ?').run('admin', 'admin123', 'admin');
+}
+
+const editorExists = db.prepare('SELECT * FROM users WHERE username = ?').get('editor');
+if (!editorExists) {
+  db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run('editor', 'editor123', 'editor');
+} else {
+  // Ensure the editor user has the editor role and correct password if it was lost
+  db.prepare('UPDATE users SET role = ?, password = ? WHERE username = ?').run('editor', 'editor123', 'editor');
+}
+
+const viewerExists = db.prepare('SELECT * FROM users WHERE username = ?').get('viewer');
+if (!viewerExists) {
+  db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run('viewer', 'viewer123', 'viewer');
+} else {
+  // Ensure the viewer user has the viewer role and correct password if it was lost
+  db.prepare('UPDATE users SET role = ?, password = ? WHERE username = ?').run('viewer', 'viewer123', 'viewer');
 }
 
 export default db;

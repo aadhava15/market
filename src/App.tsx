@@ -15,7 +15,11 @@ import {
   Printer, 
   Download,
   ScanLine,
-  ChevronRight
+  ChevronRight,
+  Globe,
+  TrendingUp,
+  Lock,
+  User as UserIcon
 } from 'lucide-react';
 import { 
   BrowserRouter as Router, 
@@ -30,6 +34,8 @@ import JsBarcode from 'jsbarcode';
 import Quagga from '@ericblade/quagga2';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { GoogleGenAI } from "@google/genai";
+import ReactMarkdown from 'react-markdown';
 
 // --- Utils ---
 function cn(...inputs: ClassValue[]) {
@@ -138,6 +144,7 @@ const Sidebar = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['admin', 'editor', 'viewer'] },
     { name: 'Purchase Entry', path: '/purchase', icon: ShoppingCart, roles: ['admin', 'editor'] },
     { name: 'Stock Reports', path: '/stock', icon: Package, roles: ['admin', 'editor', 'viewer'] },
+    { name: 'Market Insights', path: '/insights', icon: Globe, roles: ['admin', 'editor', 'viewer'] },
     { name: 'Vendors', path: '/vendors', icon: Truck, roles: ['admin', 'editor'] },
     { name: 'Categories', path: '/categories', icon: Tags, roles: ['admin', 'editor'] },
     { name: 'Users', path: '/users', icon: Users, roles: ['admin'] },
@@ -595,6 +602,34 @@ const StockReports = ({ user }: { user: User }) => {
     setIsScanning(false);
   };
 
+  const exportToCSV = () => {
+    const headers = ['Item Code', 'Item Name', 'Category', 'Barcode', 'Quantity', 'Rate', 'Unit'];
+    const rows = filteredProducts.map(p => [
+      p.item_code,
+      p.item_name,
+      p.category_name || 'N/A',
+      p.barcode_number,
+      p.quantity,
+      p.rate,
+      p.unit
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `inventory_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filteredProducts = products.filter(p => 
     p.item_name.toLowerCase().includes(search.toLowerCase()) || 
     p.barcode_number.includes(search)
@@ -638,6 +673,14 @@ const StockReports = ({ user }: { user: User }) => {
               <ScanLine size={20} />
             </button>
           )}
+          <button 
+            onClick={exportToCSV}
+            className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-100 flex items-center gap-2 px-4"
+            title="Export to CSV"
+          >
+            <Download size={20} />
+            <span className="hidden sm:inline font-medium text-sm">Export CSV</span>
+          </button>
         </div>
       </div>
 
@@ -726,6 +769,211 @@ const StockReports = ({ user }: { user: User }) => {
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+};
+
+const MarketInsights = () => {
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [insights, setInsights] = useState<string | null>(null);
+  const [sources, setSources] = useState<{ uri: string; title: string }[]>([]);
+
+  const fetchInsights = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+
+    setLoading(true);
+    setInsights(null);
+    setSources([]);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Research market trends, news, and pricing for: ${query}. Provide a concise summary of current insights.`,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      });
+
+      setInsights(response.text || "No insights found.");
+      
+      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      if (chunks) {
+        const webSources = chunks
+          .filter(chunk => chunk.web)
+          .map(chunk => ({ uri: chunk.web!.uri, title: chunk.web!.title }));
+        setSources(webSources);
+      }
+    } catch (error) {
+      console.error("Error fetching insights:", error);
+      setInsights("Failed to fetch insights. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-8 space-y-8 max-w-4xl mx-auto">
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center justify-center p-3 bg-indigo-100 text-indigo-600 rounded-2xl mb-2">
+          <Globe size={32} />
+        </div>
+        <h2 className="text-3xl font-bold text-slate-900">Market Insights</h2>
+        <p className="text-slate-500">Search for real-time market trends and news related to your inventory.</p>
+      </div>
+
+      <form onSubmit={fetchInsights} className="relative group">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={24} />
+        <input 
+          type="text" 
+          placeholder="Search for 'current price of copper', 'electronics market trends 2024'..." 
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full pl-14 pr-32 py-4 bg-white rounded-2xl border border-slate-200 shadow-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-lg"
+        />
+        <button 
+          type="submit"
+          disabled={loading}
+          className="absolute right-2 top-1/2 -translate-y-1/2 px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100"
+        >
+          {loading ? 'Searching...' : 'Search'}
+        </button>
+      </form>
+
+      {loading && (
+        <div className="space-y-4 animate-pulse">
+          <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+          <div className="h-4 bg-slate-200 rounded w-full"></div>
+          <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+        </div>
+      )}
+
+      {insights && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="p-8 space-y-6">
+            <div className="prose prose-slate max-w-none">
+              <ReactMarkdown>{insights}</ReactMarkdown>
+            </div>
+            
+            {sources.length > 0 && (
+              <div className="pt-6 border-t border-slate-100">
+                <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                  <TrendingUp size={16} className="text-indigo-500" />
+                  Sources & Further Reading
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {sources.map((source, i) => (
+                    <a 
+                      key={i} 
+                      href={source.uri} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium transition-colors border border-slate-200"
+                    >
+                      <Globe size={12} />
+                      {source.title || 'Source'}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        onLogin(data.user);
+      } else {
+        setError(data.message || 'Invalid credentials');
+      }
+    } catch (err) {
+      setError('Connection error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-3xl shadow-xl border border-slate-100">
+        <div className="text-center">
+          <div className="mx-auto h-16 w-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 mb-6">
+            <Package size={32} />
+          </div>
+          <h2 className="text-3xl font-bold text-slate-900">Welcome Back</h2>
+          <p className="mt-2 text-slate-500">Log in to manage your inventory</p>
+        </div>
+        
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && (
+            <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium border border-red-100 animate-shake">
+              {error}
+            </div>
+          )}
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="block w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
+                placeholder="Username"
+              />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="block w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
+                placeholder="Password"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50"
+          >
+            {loading ? 'Logging in...' : 'Log in'}
+          </button>
+          
+          <div className="text-center text-xs text-slate-400">
+            <p>Admin: admin / admin123</p>
+            <p>Editor: editor / editor123</p>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -1219,19 +1467,25 @@ const ProtectedRoute = ({
 
 // --- Main App ---
 
-const DEFAULT_USER: User = {
-  id: 1,
-  username: 'admin',
-  role: 'admin'
-};
-
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('stockmaster_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    localStorage.setItem('stockmaster_user', JSON.stringify(user));
+  };
 
   const handleLogout = () => {
-    // Logout disabled as login page is removed
-    console.log("Logout clicked - session persistence disabled");
+    setCurrentUser(null);
+    localStorage.removeItem('stockmaster_user');
   };
+
+  if (!currentUser) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
 
   return (
     <Router>
@@ -1246,6 +1500,7 @@ export default function App() {
               </ProtectedRoute>
             } />
             <Route path="/stock" element={<StockReports user={currentUser} />} />
+            <Route path="/insights" element={<MarketInsights />} />
             <Route path="/vendors" element={
               <ProtectedRoute user={currentUser} allowedRoles={['admin', 'editor']}>
                 <VendorsPage />
