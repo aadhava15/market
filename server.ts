@@ -18,6 +18,7 @@ async function startServer() {
 
   // Health Check
   app.get("/api/health", (req, res) => {
+    console.log("Health check requested");
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
@@ -258,6 +259,13 @@ async function startServer() {
     });
   }
 
+  // Global Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Unhandled Express Error:", err);
+    res.status(500).json({ error: "Internal Server Error", details: err.message });
+  });
+
+  console.log(`Attempting to start server on port ${PORT}...`);
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server is strictly listening on port ${PORT}`);
     console.log(`🔗 Local: http://localhost:${PORT}`);

@@ -912,6 +912,7 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
         setError(data.message || 'Invalid credentials');
       }
     } catch (err) {
+      console.error("Login fetch error:", err);
       setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
