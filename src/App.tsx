@@ -923,8 +923,8 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
 
     try {
       const origin = window.location.origin;
-      console.log(`Submitting login for ${username} at ${origin}/server/login...`);
-      const response = await fetch(`${origin}/server/login`, {
+      console.log(`Submitting login for ${username} at ${origin}/api/login...`);
+      const response = await fetch(`${origin}/api/login`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

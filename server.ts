@@ -54,7 +54,7 @@ async function startServer() {
   // --- API Routes ---
 
   // Auth
-  app.post("/server/login", (req, res) => {
+  app.post(["/server/login", "/api/login"], (req, res) => {
     const { username, password } = req.body;
     console.log(`[${new Date().toISOString()}] Login attempt - Method: ${req.method}, Path: ${req.path}`);
     console.log(`Username: ${username}`);
