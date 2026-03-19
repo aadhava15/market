@@ -930,7 +930,10 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ 
+          username: username.trim(), 
+          password: password.trim() 
+        }),
       });
 
       console.log(`Login response status: ${response.status}`);
@@ -979,6 +982,14 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+            <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">Demo Credentials</p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-indigo-600">
+              <div><span className="font-bold">Admin:</span> admin / admin123</div>
+              <div><span className="font-bold">Editor:</span> editor / editor123</div>
+            </div>
+          </div>
+
           {error && (
             <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium border border-red-100 animate-shake">
               {error}

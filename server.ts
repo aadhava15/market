@@ -64,7 +64,7 @@ async function startServer() {
         console.error("❌ Database not initialized");
         return res.status(500).json({ success: false, message: "Database error" });
       }
-      const user = db.prepare('SELECT * FROM users WHERE username = ? AND password = ?').get(username, password);
+      const user = db.prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?) AND password = ?').get(username, password);
       if (user) {
         console.log(`✅ Login successful for user: ${username}, role: ${user.role}`);
         res.json({ success: true, user: { id: user.id, username: user.username, role: user.role } });
