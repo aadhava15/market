@@ -2,6 +2,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import db from "./src/db.ts";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,6 +16,12 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Request Logger
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+  });
 
   // Health Check
   app.get("/api/health", (req, res) => {
@@ -238,9 +245,26 @@ async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "custom", // Changed to custom to handle SPA fallback manually
     });
     app.use(vite.middlewares);
+
+    // SPA Fallback for Development
+    app.use("*", async (req, res, next) => {
+      if (req.originalUrl.startsWith('/api/')) {
+        return res.status(404).json({ error: "API endpoint not found" });
+      }
+
+      const url = req.originalUrl;
+      try {
+        let template = fs.readFileSync(path.resolve(__dirname, "index.html"), "utf-8");
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(template);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
   } else {
     const distPath = path.resolve(__dirname, "dist");
     
@@ -255,7 +279,11 @@ async function startServer() {
       }
       
       const indexPath = path.join(distPath, "index.html");
-      res.sendFile(indexPath);
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send("Frontend build not found. Please run 'npm run build'.");
+      }
     });
   }
 
