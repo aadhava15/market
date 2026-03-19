@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.resolve(__dirname, '..', 'inventory.db');
+const dbPath = path.resolve(process.cwd(), 'inventory.db');
 let db: Database.Database;
 
 try {

@@ -31,6 +31,7 @@ async function startServer() {
   // Request Logger
   app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    console.log(`Headers:`, req.headers);
     next();
   });
 
@@ -272,7 +273,7 @@ async function startServer() {
 
       const url = req.originalUrl;
       try {
-        let template = fs.readFileSync(path.resolve(__dirname, "index.html"), "utf-8");
+        let template = fs.readFileSync(path.resolve(process.cwd(), "index.html"), "utf-8");
         template = await vite.transformIndexHtml(url, template);
         res.status(200).set({ "Content-Type": "text/html" }).end(template);
       } catch (e: any) {
@@ -281,7 +282,7 @@ async function startServer() {
       }
     });
   } else {
-    const distPath = path.resolve(__dirname, "dist");
+    const distPath = path.resolve(process.cwd(), "dist");
     
     // Serve static files from the dist directory
     app.use(express.static(distPath));

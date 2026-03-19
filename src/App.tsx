@@ -925,7 +925,19 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
       });
 
       console.log(`Login response status: ${response.status}`);
-      const data = await response.json();
+      const text = await response.text();
+      console.log(`Login response text:`, text);
+      
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Failed to parse login response as JSON:", e);
+        setError(`Server returned non-JSON response: ${text.substring(0, 50)}...`);
+        setLoading(false);
+        return;
+      }
+
       console.log(`Login response data:`, data);
       if (data.success) {
         onLogin(data.user);
@@ -933,8 +945,8 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
         setError(data.message || 'Invalid credentials');
       }
     } catch (err) {
-      console.error("Login fetch error:", err);
-      setError('Connection error. Please try again.');
+      console.error("Login fetch error details:", err);
+      setError(`Connection error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setLoading(false);
     }
