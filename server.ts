@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import db from "./src/db.ts";
 import path from "path";
@@ -26,27 +27,38 @@ async function startServer() {
   console.log(`Starting server with __dirname: ${__dirname}`);
   console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
 
+  app.use(cors());
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   // Request Logger
   app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-    console.log(`Headers:`, req.headers);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+    if (req.method === 'POST') {
+      console.log('Body keys:', Object.keys(req.body));
+    }
     next();
   });
 
   // Health Check
-  app.get("/api/health", (req, res) => {
+  app.get("/server/health", (req, res) => {
     console.log("Health check requested");
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    res.json({ status: "ok", timestamp: new Date().toISOString(), env: process.env.NODE_ENV });
+  });
+
+  app.get("/server/ping", (req, res) => {
+    console.log("Ping requested");
+    res.send("pong");
   });
 
   // --- API Routes ---
 
   // Auth
-  app.post("/api/login", (req, res) => {
+  app.post("/server/login", (req, res) => {
     const { username, password } = req.body;
-    console.log(`Login attempt for username: ${username}, body:`, req.body);
+    console.log(`[${new Date().toISOString()}] Login attempt - Method: ${req.method}, Path: ${req.path}`);
+    console.log(`Username: ${username}`);
+    
     try {
       if (!db) {
         console.error("❌ Database not initialized");
@@ -67,7 +79,7 @@ async function startServer() {
   });
 
   // Dashboard Stats
-  app.get("/api/stats", (req, res) => {
+  app.get("/server/stats", (req, res) => {
     const totalProducts = db.prepare('SELECT COUNT(*) as count FROM products').get().count;
     const totalStock = db.prepare('SELECT SUM(quantity) as sum FROM products').get().sum || 0;
     const totalSales = 0; // Placeholder as sales table isn't implemented yet
@@ -75,37 +87,37 @@ async function startServer() {
   });
 
   // Vendors
-  app.get("/api/vendors", (req, res) => {
+  app.get("/server/vendors", (req, res) => {
     const vendors = db.prepare('SELECT * FROM vendors').all();
     res.json(vendors);
   });
 
-  app.post("/api/vendors", (req, res) => {
+  app.post("/server/vendors", (req, res) => {
     const { name, contact, address } = req.body;
     const result = db.prepare('INSERT INTO vendors (name, contact, address) VALUES (?, ?, ?)').run(name, contact, address);
     res.json({ id: result.lastInsertRowid });
   });
 
-  app.put("/api/vendors/:id", (req, res) => {
+  app.put("/server/vendors/:id", (req, res) => {
     const { name, contact, address } = req.body;
     const { id } = req.params;
     db.prepare('UPDATE vendors SET name = ?, contact = ?, address = ? WHERE id = ?').run(name, contact, address, id);
     res.json({ success: true });
   });
 
-  app.delete("/api/vendors/:id", (req, res) => {
+  app.delete("/server/vendors/:id", (req, res) => {
     const { id } = req.params;
     db.prepare('DELETE FROM vendors WHERE id = ?').run(id);
     res.json({ success: true });
   });
 
   // Categories
-  app.get("/api/categories", (req, res) => {
+  app.get("/server/categories", (req, res) => {
     const categories = db.prepare('SELECT * FROM categories').all();
     res.json(categories);
   });
 
-  app.post("/api/categories", (req, res) => {
+  app.post("/server/categories", (req, res) => {
     const { name } = req.body;
     try {
       const result = db.prepare('INSERT INTO categories (name) VALUES (?)').run(name);
@@ -115,7 +127,7 @@ async function startServer() {
     }
   });
 
-  app.put("/api/categories/:id", (req, res) => {
+  app.put("/server/categories/:id", (req, res) => {
     const { name } = req.body;
     const { id } = req.params;
     try {
@@ -126,7 +138,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/categories/:id", (req, res) => {
+  app.delete("/server/categories/:id", (req, res) => {
     const { id } = req.params;
     try {
       db.prepare('DELETE FROM categories WHERE id = ?').run(id);
@@ -137,7 +149,7 @@ async function startServer() {
   });
 
   // Products & Purchase Entries
-  app.get("/api/products", (req, res) => {
+  app.get("/server/products", (req, res) => {
     const products = db.prepare(`
       SELECT p.*, c.name as category_name 
       FROM products p 
@@ -146,7 +158,7 @@ async function startServer() {
     res.json(products);
   });
 
-  app.post("/api/purchase", (req, res) => {
+  app.post("/server/purchase", (req, res) => {
     const {
       vendor_id,
       purchase_date,
@@ -195,7 +207,7 @@ async function startServer() {
   });
 
   // Search by Barcode
-  app.get("/api/products/barcode/:code", (req, res) => {
+  app.get("/server/products/barcode/:code", (req, res) => {
     const product = db.prepare(`
       SELECT p.*, c.name as category_name 
       FROM products p 
@@ -210,13 +222,13 @@ async function startServer() {
   });
 
   // Users
-  app.get("/api/users", (req, res) => {
+  app.get("/server/users", (req, res) => {
     // In a real app, we'd check the session/token here
     const users = db.prepare('SELECT id, username, role FROM users').all();
     res.json(users);
   });
 
-  app.post("/api/users", (req, res) => {
+  app.post("/server/users", (req, res) => {
     const { username, password, role, requesterRole } = req.body;
     if (requesterRole !== 'admin') {
       return res.status(403).json({ error: "Only admins can create users" });
@@ -229,7 +241,7 @@ async function startServer() {
     }
   });
 
-  app.put("/api/users/:id", (req, res) => {
+  app.put("/server/users/:id", (req, res) => {
     const { username, password, role, requesterRole } = req.body;
     const { id } = req.params;
     if (requesterRole !== 'admin') {
@@ -247,7 +259,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/users/:id", (req, res) => {
+  app.delete("/server/users/:id", (req, res) => {
     const { id } = req.params;
     const { requesterRole } = req.query;
     if (requesterRole !== 'admin') {
@@ -267,8 +279,14 @@ async function startServer() {
 
     // SPA Fallback for Development
     app.use("*", async (req, res, next) => {
-      if (req.originalUrl.startsWith('/api/')) {
-        return res.status(404).json({ error: "API endpoint not found" });
+      // If it's an API route that wasn't handled, return 404 JSON
+      if (req.originalUrl.startsWith('/server/')) {
+        console.warn(`[404] API route not found: ${req.method} ${req.originalUrl}`);
+        return res.status(404).json({ 
+          error: "API endpoint not found",
+          method: req.method,
+          path: req.originalUrl
+        });
       }
 
       const url = req.originalUrl;
@@ -290,7 +308,7 @@ async function startServer() {
     // SPA Fallback: Serve index.html for any unknown routes
     app.get("*", (req, res) => {
       // Skip API routes to avoid infinite loops or wrong responses
-      if (req.path.startsWith('/api/')) {
+      if (req.path.startsWith('/server/')) {
         return res.status(404).json({ error: "API endpoint not found" });
       }
       

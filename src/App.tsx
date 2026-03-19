@@ -209,7 +209,7 @@ const Dashboard = ({ user }: { user: User }) => {
   const [stats, setStats] = useState({ totalProducts: 0, totalStock: 0, totalSales: 0 });
 
   useEffect(() => {
-    fetch('/api/stats')
+    fetch('/server/stats')
       .then(res => res.json())
       .then(data => setStats(data));
   }, []);
@@ -303,8 +303,8 @@ const PurchaseEntry = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
-    fetch('/api/vendors').then(res => res.json()).then(setVendors);
-    fetch('/api/categories').then(res => res.json()).then(setCategories);
+    fetch('/server/vendors').then(res => res.json()).then(setVendors);
+    fetch('/server/categories').then(res => res.json()).then(setCategories);
   }, []);
 
   useEffect(() => {
@@ -336,7 +336,7 @@ const PurchaseEntry = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/purchase', {
+    const res = await fetch('/server/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData)
@@ -550,7 +550,7 @@ const StockReports = ({ user }: { user: User }) => {
   const canManage = user.role === 'admin' || user.role === 'editor';
 
   useEffect(() => {
-    fetch('/api/products').then(res => res.json()).then(setProducts);
+    fetch('/server/products').then(res => res.json()).then(setProducts);
   }, []);
 
   const startScanner = () => {
@@ -897,10 +897,15 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const res = await fetch('/api/health');
+        const origin = window.location.origin;
+        console.log(`Checking server health at: ${origin}/server/health`);
+        const res = await fetch(`${origin}/server/health`);
         if (res.ok) {
+          const data = await res.json();
+          console.log('Server health check passed:', data);
           setServerStatus('up');
         } else {
+          console.warn('Server health check failed with status:', res.status);
           setServerStatus('down');
         }
       } catch (err) {
@@ -917,10 +922,14 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
     setLoading(true);
 
     try {
-      console.log(`Submitting login for ${username}...`);
-      const response = await fetch('/api/login', {
+      const origin = window.location.origin;
+      console.log(`Submitting login for ${username} at ${origin}/server/login...`);
+      const response = await fetch(`${origin}/server/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ username, password }),
       });
 
@@ -1030,12 +1039,12 @@ const VendorsPage = () => {
   }, []);
 
   const fetchVendors = () => {
-    fetch('/api/vendors').then(res => res.json()).then(setVendors);
+    fetch('/server/vendors').then(res => res.json()).then(setVendors);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = editingId ? `/api/vendors/${editingId}` : '/api/vendors';
+    const url = editingId ? `/server/vendors/${editingId}` : '/server/vendors';
     const method = editingId ? 'PUT' : 'POST';
     
     const res = await fetch(url, {
@@ -1058,7 +1067,7 @@ const VendorsPage = () => {
 
   const confirmDelete = async () => {
     if (!deleteId) return;
-    const res = await fetch(`/api/vendors/${deleteId}`, { method: 'DELETE' });
+    const res = await fetch(`/server/vendors/${deleteId}`, { method: 'DELETE' });
     if (res.ok) fetchVendors();
     setDeleteId(null);
   };
@@ -1166,12 +1175,12 @@ const CategoriesPage = () => {
   }, []);
 
   const fetchCategories = () => {
-    fetch('/api/categories').then(res => res.json()).then(setCategories);
+    fetch('/server/categories').then(res => res.json()).then(setCategories);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = editingId ? `/api/categories/${editingId}` : '/api/categories';
+    const url = editingId ? `/server/categories/${editingId}` : '/server/categories';
     const method = editingId ? 'PUT' : 'POST';
 
     const res = await fetch(url, {
@@ -1197,7 +1206,7 @@ const CategoriesPage = () => {
 
   const confirmDelete = async () => {
     if (!deleteId) return;
-    const res = await fetch(`/api/categories/${deleteId}`, { method: 'DELETE' });
+    const res = await fetch(`/server/categories/${deleteId}`, { method: 'DELETE' });
     if (res.ok) {
       fetchCategories();
     } else {
@@ -1307,7 +1316,7 @@ const UsersPage = ({ user: currentUser }: { user: User }) => {
   }, []);
 
   const fetchUsers = () => {
-    fetch('/api/users').then(res => res.json()).then(setUsers);
+    fetch('/server/users').then(res => res.json()).then(setUsers);
   };
 
   const filteredUsers = users.filter(u => 
@@ -1317,7 +1326,7 @@ const UsersPage = ({ user: currentUser }: { user: User }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = editingId ? `/api/users/${editingId}` : '/api/users';
+    const url = editingId ? `/server/users/${editingId}` : '/server/users';
     const method = editingId ? 'PUT' : 'POST';
     
     const res = await fetch(url, {
@@ -1343,7 +1352,7 @@ const UsersPage = ({ user: currentUser }: { user: User }) => {
 
   const confirmDelete = async () => {
     if (!deleteId) return;
-    const res = await fetch(`/api/users/${deleteId}?requesterRole=${currentUser.role}`, { method: 'DELETE' });
+    const res = await fetch(`/server/users/${deleteId}?requesterRole=${currentUser.role}`, { method: 'DELETE' });
     if (res.ok) fetchUsers();
     setDeleteId(null);
   };
