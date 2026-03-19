@@ -892,6 +892,24 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'checking' | 'up' | 'down'>('checking');
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+          setServerStatus('up');
+        } else {
+          setServerStatus('down');
+        }
+      } catch (err) {
+        console.error("Health check failed:", err);
+        setServerStatus('down');
+      }
+    };
+    checkHealth();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -899,13 +917,16 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
     setLoading(true);
 
     try {
+      console.log(`Submitting login for ${username}...`);
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
 
+      console.log(`Login response status: ${response.status}`);
       const data = await response.json();
+      console.log(`Login response data:`, data);
       if (data.success) {
         onLogin(data.user);
       } else {
@@ -928,6 +949,12 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
           </div>
           <h2 className="text-3xl font-bold text-slate-900">Inventory Management</h2>
           <p className="mt-2 text-slate-500">Log in to manage your warehouse</p>
+          {serverStatus === 'down' && (
+            <p className="mt-2 text-red-500 text-xs font-semibold">⚠️ Server connection error. Please wait or refresh.</p>
+          )}
+          {serverStatus === 'checking' && (
+            <p className="mt-2 text-slate-400 text-xs">Checking server connection...</p>
+          )}
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
