@@ -926,8 +926,8 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User) => void }) => {
           <div className="mx-auto h-16 w-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 mb-6">
             <Package size={32} />
           </div>
-          <h2 className="text-3xl font-bold text-slate-900">Welcome Back</h2>
-          <p className="mt-2 text-slate-500">Log in to manage your inventory</p>
+          <h2 className="text-3xl font-bold text-slate-900">Inventory Management</h2>
+          <p className="mt-2 text-slate-500">Log in to manage your warehouse</p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
